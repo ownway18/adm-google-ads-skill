@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "cc.adm/google-ads",
+  "title": "ADM Google Ads",
+  "description": "Google Ads reports, search term analysis and AI Search campaign drafts for AI coding tools.",
+  "version": "1.0.0",
+  "websiteUrl": "https://adm.cc/docs/google-ads-skill",
+  "icons": [
+    {
+      "src": "https://adm.cc/apple-touch-icon.png",
+      "mimeType": "image/png",
+      "sizes": ["180x180"]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://app.adm.cc/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "ADM API key as a Bearer token. Create a key at https://app.adm.cc/apikeys",
+          "value": "Bearer {adm_api_key}",
+          "isRequired": true,
+          "isSecret": true,
+          "variables": {
+            "adm_api_key": {
+              "description": "ADM API key (starts with adm_)",
+              "isRequired": true,
+              "isSecret": true
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "adm-google-ads-skill",
+  "owner": {
+    "name": "ADM"
+  },
+  "metadata": {
+    "description": "ADM Google Ads skill for Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "adm-google-ads",
+      "description": "Google Ads reports, search term analysis and Search campaign drafts through the ADM MCP server",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/adm-google-ads"
+      ]
+    }
+  ]
+}
