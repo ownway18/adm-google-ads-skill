@@ -1,8 +1,8 @@
 ---
 name: adm-google-ads
-description: Read and change the user's Google Ads accounts through the ADM MCP server (tools named mcp__adm__* or adm.*). Use when the user asks about Google Ads performance, campaigns, keywords, search terms, ads, negative keywords or assets, asks for a report, or asks to create, build, import or resume campaigns, ad groups, ads, keywords, negative keyword lists, assets or image assets from a plan, spreadsheet or markdown file, to draft a new Search campaign or ad groups with ADM AI from a landing page, to pause, enable or remove ads, keywords or ad groups, to add or remove negative keywords, to change a campaign name, budget, bidding or locations, to see performance by device or location, to lower or exclude device bids, to exclude a location that spends without converting, to create or change a shared portfolio bidding strategy, to pause or unlink assets, to set custom parameters or URL options for click tracking, to check a finished build against its plan, or to switch the Google Ads account ADM works on.
+description: Read and change the user's Google Ads accounts through the ADM MCP server (tools named mcp__adm__* or adm.*). Use when the user asks about Google Ads performance, campaigns, keywords, search terms, ads, negative keywords or assets, asks for a report, asks to optimize an account or campaign or cut wasted spend, or asks to create, build, import or resume campaigns, ad groups, ads, keywords, negative keyword lists, assets or image assets from a plan, spreadsheet or markdown file, to draft a new Search campaign or ad groups with ADM AI from a landing page, to pause, enable or remove ads, keywords or ad groups, to add or remove negative keywords, to change a campaign name, budget, bidding or locations, to see performance by device or location, to adjust or exclude device and location bids, to create or change a shared portfolio bidding strategy, to pause or unlink assets, to set URL options for click tracking, to check a finished build against its plan, or to switch the Google Ads account ADM works on.
 metadata:
-  version: "2026-10-08"
+  version: "2026-10-12"
 ---
 
 # ADM: Google Ads skill
@@ -73,6 +73,7 @@ Example prompts (adapt names and language):
   - Which keywords had the highest cost per conversion in the last 30 days?
   - How did each ad in `<campaign>` perform in the last 30 days?
   - Do my campaigns have enough sitelinks, callouts and structured snippets?
+  - Review the last 14 days and suggest what to optimize.
 - Changes (each change is previewed and waits for approval)
   - Suggest negative keywords for `<campaign>` from the last 30 days of search terms, and add them after I approve.
   - Create the campaigns in plan.md. Preview first and wait for my approval.
@@ -87,7 +88,86 @@ Example prompts (adapt names and language):
 
 ## Reports and questions
 
-For questions about performance, call the report tools `get_campaigns`, `get_keywords`, `get_search_terms` and `get_ads` with `days` 7, 14 or 30, and narrow large reads with `campaign_id`. State the date window and currency in the answer. `get_campaigns` includes target CPA, target ROAS and the portfolio strategy when the campaign uses one. `get_ads` can take `text_contains` and `compact`; each headline and description includes `performance_label`. `get_keywords` can filter by `status`, `match_type` and `text_contains`. `get_ad_groups` lists ad groups with keyword and ad counts. `get_paused_summary` counts paused campaigns, ad groups, keywords and ads. `find_negative_conflicts` shows which negative blocks which keyword. `get_negative_keywords` and `get_assets` take no `days`: they return the current setup, not performance for a period. `get_assets` accepts `level`, `types`, `asset_ids`, `link_status`, `limit` and `cursor`. `get_campaign_setup` omits assets unless `include` contains `assets`. `get_conversion_actions` lists conversion actions and whether each is primary (counts in the Conversions column); `include_metrics` adds `conversions`, `all_conversions` and `conversions_value` for the last 30 days. `get_customizers` lists ad customizer attributes and their values at account, campaign and ad group level. Suggest changes as text; make a change only when the user asks, following the preview rules above.
+For questions about performance, call the report tools `get_campaigns`, `get_keywords`, `get_search_terms` and `get_ads` with `days` from 1 to 30 (default 7), and narrow large reads with `campaign_id` (`get_campaigns` lists every campaign and does not take it). Tools that return `next_cursor` are paged: follow it until it is gone before saying that something is absent. Page size is `limit`, 1 to 200 (default 50); ask for 200 on large reads. `get_campaigns`, `get_keywords` and `get_search_terms` sort by cost, highest first. `get_paused_summary` lists at most 200 rows per level; when a level has `truncated: true`, use the paged tool for that level. State the date window and currency in the answer. `get_campaigns` includes target CPA, target ROAS and the portfolio strategy when the campaign uses one; it reports Maximize Clicks as `TARGET_SPEND`, which the write tools call `MAXIMIZE_CLICKS`. `get_ads` can take `text_contains` and `compact` (`compact` returns only ids and text, without status, final URL, metrics or `performance_label`); otherwise each headline and description includes `performance_label`. `get_keywords` can filter by `status`, `match_type` and `text_contains`. `get_ad_groups` lists ad groups with keyword and ad counts (both include paused ones); without `campaign_id` it covers every campaign. `get_paused_summary` counts paused campaigns, ad groups, keywords and ads. `find_negative_conflicts` shows which negative blocks which keyword. `get_negative_keywords` and `get_assets` take no `days`: they return the current setup, not performance for a period. `get_assets` accepts `level`, `types`, `asset_ids`, `link_status`, `limit` and `cursor`. `get_campaign_setup` omits assets unless `include` contains `assets`. `get_conversion_actions` lists conversion actions and whether each is primary (counts in the Conversions column); `include_metrics` adds `conversions`, `all_conversions` and `conversions_value` for the last 30 days. `get_customizers` lists ad customizer attributes and their values at account, campaign and ad group level. Suggest changes as text; make a change only when the user asks, following the preview rules above.
+
+## Optimizing an account
+
+Use this section when the user asks to optimize, improve or review an account or campaign, or to cut wasted spend. How to analyse is your call; the points below are the ones that are easy to get wrong.
+
+**What to read**
+
+1. `get_campaigns` for spend, conversions, bidding strategy and target CPA or target ROAS. Read every page: a campaign without spend in the window sorts last.
+2. `get_conversion_actions` with `include_metrics: true` to see what counts as a conversion.
+3. For the campaigns that make up most of the spend in the user's window (about two thirds is enough): `get_search_terms`, `get_keywords` and `get_ads`. For the others, compare 30-day spend and conversions at campaign level, and name in the answer the campaigns you did not read in detail. Small campaigns that together spend much and convert little deserve a look as a group. Add `get_device_performance` or `get_location_performance` when the question is about devices or locations, or when one campaign spends far more than it returns.
+4. For each of those campaigns, `get_ad_groups` and `get_negative_keywords`. A keyword or an ad can be ENABLED inside a paused ad group, and a search term with `status` `none` can already be covered by a phrase or broad negative or by a shared list (`added` and `excluded` mark a term that is itself a keyword or a negative). Keyword, ad and conflict rows do not carry the ad group's status: match them to `get_ad_groups` by ad group id. `get_negative_keywords` repeats the account-level list on every call, so read that list once.
+
+Look first for things that are enabled but cannot serve: an enabled ad group whose `ad_count` or `keyword_count` is 0, above all one that had spend or conversions in the 30 days; an enabled campaign whose ad groups are all paused; and an enabled ad group without impressions whose keywords or ads are all paused (the counts include paused ones, so check `get_keywords` or `get_ads`). Reading `get_ad_groups` without `campaign_id` through the last page shows the first two for every campaign; judge a campaign only after all its ad groups are read. Report these before anything else.
+
+`get_search_terms` returns rows by cost, highest first. Once a page reaches rows without cost, the remaining pages hold no spend. Read with `limit: 200`. When a campaign has more rows with cost than a few pages, stop and say how many rows and how much of the campaign's cost you covered. To read one search term or theme, pass it as `text_contains` and follow `next_cursor` until it is gone. When `truncated` is true the report was capped before the filter, so rows may be missing: narrow the read with `campaign_id` or a shorter `days`, and do not conclude that a term has no conversions from a capped read. A response without `truncated` was not capped. The report leaves out rare searches, so its rows can add up to less than the keyword's cost; say so when the gap is large.
+
+When no campaign has spend in the user's window or in 30 days (for example, everything is paused), stop there: say so, suggest no change, and ask what the user wants to look at.
+
+When a campaign is enabled but has no impressions in the user's window, check its ad groups first: all of them paused explains it. Report it either way and ask the user whether that is intended. Beyond that the tools do not show why.
+
+**Windows**
+
+- Use the window the user asks for to find what changed. Say in the answer that conversions from the most recent days may not be reported yet when the window is shorter than 7 days.
+- Before suggesting to pause something, add a negative, or change a bid, budget or target, read that same campaign, keyword or search term with `days: 30` and base the suggestion on the 30-day numbers. Skip the extra read when the user's window is already 30 days.
+- Compare the two windows for the item you would change, not only for its campaign. They disagree when the item is on opposite sides of its target or average in the two windows (a weak last 3 days in a keyword that does well over 30, or a strong last 3 days in one that does poorly over 30). Then report the short-window numbers as something to watch and suggest no change. A keyword with spend and no conversions in both windows does not disagree. Nor does an item whose short-window cost is below its 30-day cost per conversion: no conversion yet is what to expect there.
+- 30-day totals include ad groups, keywords and ads that are paused now. Before using a 30-day result as evidence for what is running now, check which ad groups are still enabled and take cost, conversions and conversion value together from those ad groups only. Do not mix them with the campaign total. `get_ad_groups` has no metrics; `get_device_performance` with `level: ad_group` gives them per ad group once the device rows are added up. An enabled ad group can also owe its 30-day numbers to a keyword or an ad that is paused or removed now. `get_keywords` returns enabled and paused keywords, and an ENABLED keyword can sit in a paused ad group: split the rows into those running now (keyword enabled in an enabled ad group) and the rest, and add up cost, conversions and conversion value for each. When the rest, or a gap between the keyword total and the ad group's spend, account for about a fifth or more of the ad group's result, say so, leave that ad group out of the average and ask the user about it. Check ad status in `get_ads` as well; matching keyword totals say nothing about the ads.
+- Thirty days of data can be only a few days old. When about half or more of an item's 30-day spend falls inside its last 7 days (or inside the user's window when that is shorter), treat its age as unknown and ask the user when it started.
+- For a weekly figure such as conversions per week, read `days: 7`.
+
+**Facts the tools do not return**
+
+The reports do not include creation dates, the "Limited by budget" status, impression share or change history. When a suggestion depends on one of these, write it as unknown and ask the user (for example, "Was this keyword added in the last two weeks?"). Do not state a guess as a fact.
+
+**Conversions**
+
+Read the 30-day conversion metrics before suggesting anything. Then:
+
+- No conversion action at all, or none with status ENABLED: say that conversion tracking has to be set up in Google Ads first. Limit suggestions to search terms that are plainly unrelated to the business.
+- Enabled actions exist but none is primary: a campaign can still optimize toward a non-primary action through a custom goal, and the tools do not show campaign goals. When `get_campaigns` reports conversions, use them. When it reports none, say that it is unknown which action the campaigns count, and ask the user.
+- A primary conversion action exists, the account has spend, and the 30-day count is 0: write "no conversions reported". Do not claim that tracking is broken. Suggestions can limit spend on the items that cost the most.
+- Conversions are reported: judge each item against the campaign's target CPA or target ROAS. When the campaign has no target, compare the item with the campaign average and ask the user what cost per conversion or return they aim for before suggesting a budget or bid change.
+
+When an action that is not primary shows `conversions` above 0 in the 30 days, either a campaign counts it through a custom goal, or the primary action was changed during that time. The same question arises when a primary action shows `conversions` of 0 next to `all_conversions` above 0. The tools cannot tell which, so ask the user, and give the numbers you see (for example, whether the campaign totals equal one action or the sum of two). The action figures cover the whole account, so compare them with the sum over every campaign, not with one campaign. When that sum equals one primary action exactly, the counts most likely follow that action: carry on, and say in the answer that the suggestions assume it and which other action showed conversions. Only when the user confirms a change do the 30-day conversion counts mix two definitions: then say so and do not compare 30-day cost per conversion with the short window. In the other cases, until the user answers, report the numbers and hold back suggestions that rest on cost per conversion; the figures can still support leaving an item alone. Suggestions that do not rest on it, such as an enabled ad group that cannot serve or a plainly unrelated search term, can still be made.
+
+**When to hold back**
+
+- A campaign or keyword the user confirms is less than 14 days old: report the numbers, suggest no change.
+- An item without conversions whose 30-day cost is below the campaign's target CPA: report the numbers and do not suggest pausing it or changing its bid on performance alone. For a campaign with a target ROAS or no target, use its 30-day average cost per conversion instead, taken from the ad groups that are still enabled. When those ad groups have no conversions there is no average: suggest no pause on performance alone and ask the user what cost per conversion is acceptable. The same limit applies to pausing a whole ad group. An item without conversions whose cost has reached that limit but is less than about twice it is a small sample: give the numbers, say so, and let the user choose between pausing it and watching it longer. Below the limit the rule above stands. An item with fewer than about two conversions whose cost is below about twice that limit is a small sample in the same way: do not suggest pausing it on its cost per conversion alone. Above that, its cost per conversion can be judged against the target. This limit does not apply to a search term that is plainly unrelated to the business, which can be proposed as a negative at any cost, or to a fault the user confirms, such as a broken landing page.
+- Change one thing at a time. After a bid, budget or target change, allow 7 to 14 days before judging the result; suggest no further change of the same kind inside that period when the user tells you about a recent one.
+- Suggest a higher budget only for a campaign that meets its target. A campaign with fewer than about 10 conversions a week usually gains little from more budget, and so does one that spends well below its current budget.
+- A target on a portfolio bidding strategy applies to every campaign that uses it. Before suggesting a change to it, name those campaigns.
+- When higher bids did not bring more traffic, ask whether the campaign is limited by budget before suggesting another increase.
+
+**Negative keywords**
+
+- Default to exact match. Use phrase match only for generic words unrelated to the business (for example jobs, tutorial). Never add a phrase negative that contains a core product word. Judge what the business sells from its ads and landing pages in `get_ads`; when it is unclear whether a product is sold, ask instead of proposing the negative.
+- Keep words that bring customers in: `free` and `trial` for a product with a free plan or trial, `cheap`, `discount` and `sale` for a store that competes on price. When the account already has such a word as a negative, point it out and ask the user whether it is intended.
+- Take candidates from search terms that cost money and have no conversions in 30 days, within the limit in "When to hold back". Drop a candidate that an existing negative already covers. When three or more of them share a theme, one phrase negative for the shared word can replace them, under the rule above.
+- `get_search_terms` returns one row per matching keyword, so the same search term can appear several times. Before proposing a negative, read that search term with `days: 30` and `text_contains` through the last page, add up every row within the level the negative would cover (ad group, campaign or account) and propose it only when none of those rows has a conversion. When the report covers only a small part of the keyword's cost, say that the check is partial. For a phrase negative, also check that no search term containing the phrase has converted.
+- Before the preview, pass the proposed negatives to `find_negative_conflicts` (its `negatives` argument checks words not added yet; give each one `text` and `match_type` as separate fields, not in Google notation, plus `level`: `account` needs no id, `campaign` needs `campaign_id`, `ad_group` needs both `campaign_id` and `ad_group_id`; an empty `conflicts` list means none was found) and drop or narrow any that would block a keyword. The result also lists conflicts that exist already; only a row that names one of the proposed negatives counts against it. Run it again after the change and report the result.
+
+**Keywords and ads**
+
+- A search term that has converted and has `status` `none` is a candidate for a new exact match keyword.
+- In a brand campaign, do not add keywords without the brand name. Whether search terms without the brand name belong there is the user's call: report them with their numbers and ask before proposing them as negatives.
+- Before suggesting to pause a keyword or an ad, check that the ad group keeps at least one enabled ad and one enabled keyword. Do not suggest pausing an item that meets the campaign target.
+
+**Common patterns**
+
+| What the numbers show | Likely cause | Check first |
+|---|---|---|
+| Many impressions, very low CTR | Ads serve on the Display Network or search partners | Network settings in `get_campaign_setup` |
+| Traffic rose after a bid increase, conversions or ROAS fell | The higher bid brought in lower-intent queries | Search terms for the period after the change |
+| Generic or consumer queries in a specialist ad group | Broad match, or keywords without a qualifying word | Match types in `get_keywords`, then negatives |
+| Budget went up, impressions did not | Too few conversions for the bidding strategy to learn from | Conversions per week: `get_campaigns` with `days: 7` |
+
+**Answer format**
+
+List suggestions in order of expected effect. For each one give the item, the window, the numbers it rests on, and what is unknown. Give the list as text first. Make a change only after the user picks it, one preview per change, following the preview rules above.
 
 ## Workflow: build campaigns from a plan
 

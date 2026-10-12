@@ -10,7 +10,7 @@ The skill is one file, [`skills/adm-google-ads/SKILL.md`](skills/adm-google-ads/
 
 ## What it does
 
-- **Reports**: campaigns, ad groups, keywords with Quality Score, responsive search ads with ad strength, assets and conversion actions, over the last 7, 14 or 30 days.
+- **Reports**: campaigns, ad groups, keywords with Quality Score, responsive search ads with ad strength, assets and conversion actions, over any window from 1 to 30 days.
 - **Search terms**: the queries that triggered your ads, with the matched keyword and performance.
 - **Device and location performance**: performance split by device, country, region or city, with the current bid adjustments.
 - **Negative keyword checks**: positive keywords blocked by negatives at account, shared list, campaign or ad group level.
